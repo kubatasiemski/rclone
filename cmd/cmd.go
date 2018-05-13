@@ -11,11 +11,13 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"regexp"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -293,6 +295,17 @@ func ShowStats() bool {
 	return statsIntervalFlag != nil && statsIntervalFlag.Changed
 }
 
+// SigInfoHandler creates SigInfo handler
+func SigInfoHandler() {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINFO)
+	go func() {
+		for range signals {
+			log.Printf("%v\n", accounting.Stats.String())
+		}
+	}()
+}
+
 // Run the function with stats and retries if required
 func Run(Retry bool, showStats bool, cmd *cobra.Command, f func() error) {
 	var err error
@@ -303,6 +316,7 @@ func Run(Retry bool, showStats bool, cmd *cobra.Command, f func() error) {
 	if showStats {
 		stopStats = StartStats()
 	}
+	SigInfoHandler()
 	for try := 1; try <= *retries; try++ {
 		err = f()
 		if !Retry || (err == nil && !accounting.Stats.Errored()) {
