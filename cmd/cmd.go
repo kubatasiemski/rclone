@@ -298,10 +298,10 @@ func ShowStats() bool {
 // SigInfoHandler creates SigInfo handler
 func SigInfoHandler() {
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINFO)
+	signal.Notify(signals, syscall.Signal(0x1d))
 	go func() {
 		for range signals {
-			log.Printf("%v\n", accounting.Stats.String())
+			log.Printf("%v\n", accounting.Stats)
 		}
 	}()
 }
@@ -316,7 +316,9 @@ func Run(Retry bool, showStats bool, cmd *cobra.Command, f func() error) {
 	if showStats {
 		stopStats = StartStats()
 	}
-	SigInfoHandler()
+	if runtime.GOOS == "darwin" {
+		SigInfoHandler()
+	}
 	for try := 1; try <= *retries; try++ {
 		err = f()
 		if !Retry || (err == nil && !accounting.Stats.Errored()) {
